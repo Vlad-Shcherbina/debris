@@ -1,0 +1,9 @@
+getAttribLocation - just an index of attrib inside a particular shader program
+in every shader program starts with 0
+
+enableVertexAttribArray - global, does not require bound buffer
+vertexAttribPointer - assign addr or the current buffer to the global pointer
+bufferData - writes stuff to the currently bound buffer
+
+Does not matter when useProgram is called relative to buffer setup,
+as long as it's before drawArrays.

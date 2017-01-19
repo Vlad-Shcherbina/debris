@@ -30,7 +30,71 @@ function makeShaderProgram(
     return prog;
 }
 
-var gl : WebGLRenderingContext = null;
+function makeCircleDrawer(gl: WebGLRenderingContext) {
+    let prog = makeShaderProgram(gl, `
+    attribute vec2 pos;
+    attribute vec2 texcoord;
+
+    varying vec2 v_texcoord;
+
+    void main() {
+      gl_Position = vec4(pos, 0, 1.0);
+      v_texcoord = texcoord;
+    }
+    `, `
+    precision mediump float;
+
+    varying vec2 v_texcoord;
+
+    void main() {
+      if (dot(v_texcoord, v_texcoord) <= 1.0)
+        gl_FragColor = vec4(v_texcoord, 1, 1);
+      else
+        gl_FragColor = vec4(0, 0, 0, 1);
+    }
+    `);
+    let pos_attr = gl.getAttribLocation(prog, "pos");
+    let texcoord_attr = gl.getAttribLocation(prog, "texcoord");
+
+    let pos_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, pos_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(8), gl.DYNAMIC_DRAW);
+
+    let texcoord_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texcoord_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,
+        1, -1,
+        1, 1,
+        -1, 1,
+    ]), gl.STATIC_DRAW);
+
+    function drawCircle(x, y, r) {
+        gl.useProgram(prog);
+
+        gl.enableVertexAttribArray(pos_attr);
+        gl.bindBuffer(gl.ARRAY_BUFFER, pos_buffer);
+        let vertices = new Float32Array([
+            x - r, y - r,
+            x + r, y - r,
+            x + r, y + r,
+            x - r, y + r,
+        ]);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices);
+        gl.vertexAttribPointer(pos_attr, 2, gl.FLOAT, false, 0, 0);
+
+        gl.enableVertexAttribArray(texcoord_attr);
+        gl.bindBuffer(gl.ARRAY_BUFFER, texcoord_buffer);
+        gl.vertexAttribPointer(texcoord_attr, 2, gl.FLOAT, false, 0, 0);
+
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+        gl.useProgram(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    return drawCircle;
+}
 
 function start() {
     let canvas = <HTMLCanvasElement>document.getElementById('glcanvas');
@@ -39,38 +103,11 @@ function start() {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    let prog = makeShaderProgram(gl, `
-    attribute vec2 pos;
-    void main() {
-      gl_Position = vec4(pos, 0, 1.0);
-    }
-    `, `
-    precision mediump float;
-    void main() {
-      gl_FragColor = vec4(1, 1, 1, 1);
-    }
-    `);
-
-    let pos_attr = gl.getAttribLocation(prog, "pos");
-    let buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(6), gl.DYNAMIC_DRAW);
-    gl.vertexAttribPointer(pos_attr, 2, gl.FLOAT, false, 0, 0);
-
-    let vertices = new Float32Array([
-        0, 0,
-        1, 0,
-        0, 1]);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices);
-
-    gl.useProgram(prog);
-
-    gl.enableVertexAttribArray(pos_attr);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.vertexAttribPointer(pos_attr, 2, gl.FLOAT, false, 0, 0);
-
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    let drawCircle = makeCircleDrawer(gl);
+    drawCircle(0.5, 0, 0.5);
+    drawCircle(0.1, 0.3, 0.2);
+    drawCircle(0.1, -0.3, 0.25);
+    drawCircle(-0.1, -0.3, 0.15);
 }
 
 start();
