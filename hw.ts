@@ -141,6 +141,21 @@ function start() {
     let prev_t = null;
 
     let bubbles: Bubble[] = [];
+
+    canvas.onclick = function(e) {
+        let rect = canvas.getBoundingClientRect();
+        let x = (e.clientX - rect.left) / rect.width * 2 - 1;
+        let y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
+
+        let b = new Bubble();
+        b.x = x;
+        b.y = y;
+        b.r = 0.05;
+        b.t_min = -0.2;
+        b.t_max = 0.2;
+        bubbles.push(b);
+    }
+
     function renderFrame(t) {
         let dt = prev_t ? (t - prev_t) * 0.001 : 0;
         prev_t = t;
