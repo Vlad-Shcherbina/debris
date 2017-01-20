@@ -100,6 +100,35 @@ function makeCircleDrawer(gl: WebGLRenderingContext) {
     return drawCircle;
 }
 
+class Bubble {
+    x: number;
+    y: number;
+    r: number;
+    t_min: number;
+    t_max: number;
+    constructor() {
+        this.x = (Math.random() * 2 - 1) * 0.9;
+        this.y = (Math.random() * 2 - 1) * 0.9;
+        this.r = 0.2 + Math.random() * 0.1;
+        this.t_min = 0;
+        this.t_max = this.r * 20;
+    }
+    idle(dt: number) {
+        this.t_min -= dt;
+        this.t_max -= dt;
+    }
+    isAlive() {
+        return this.t_max >= 0;
+    }
+    draw(drawCircle) {
+        if (this.t_min > 0 || this.t_max < 0)
+            return;
+        let a = -this.t_min / (this.t_max - this.t_min);
+        a = 1 - 2 * Math.abs(a - 0.5);
+        drawCircle(this.x, this.y, this.r * Math.sqrt(1 - (1-a)*(1-a)), /*sharpness*/10 * a);
+    }
+}
+
 function start() {
     let canvas = <HTMLCanvasElement>document.getElementById('glcanvas');
     let gl = glFromCanvas(canvas);
@@ -108,14 +137,30 @@ function start() {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
     let drawCircle = makeCircleDrawer(gl);
-    drawCircle(0.5, 0, 0.5);
-    drawCircle(0.1, 0.3, 0.2);
-    drawCircle(0.1, -0.3, 0.25, /*sharpness*/2);
-    drawCircle(-0.1, -0.3, 0.15);
+    let prev_t = null;
+
+    let bubbles: Bubble[] = [];
+    function renderFrame(t) {
+        let dt = prev_t ? (t - prev_t) * 0.001 : 0;
+        prev_t = t;
+
+        requestAnimationFrame(renderFrame);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        for (let b of bubbles) {
+            b.draw(drawCircle);
+            b.idle(dt);
+        }
+        const spawn_rate = 2;
+        if (Math.random() < dt * spawn_rate) {
+            bubbles.push(new Bubble());
+        }
+        bubbles = bubbles.filter((b) => b.isAlive());
+    }
+    requestAnimationFrame(renderFrame);
 }
 
 start();
