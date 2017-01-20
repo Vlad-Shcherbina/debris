@@ -44,15 +44,18 @@ function makeCircleDrawer(gl: WebGLRenderingContext) {
     `, `
     precision mediump float;
 
+    uniform float sharpness;
+
     varying vec2 v_texcoord;
 
     void main() {
-      if (dot(v_texcoord, v_texcoord) <= 1.0)
-        gl_FragColor = vec4(v_texcoord, 1, 1);
-      else
-        gl_FragColor = vec4(0, 0, 0, 1);
+      float a = clamp(
+          (1.0 - sqrt(dot(v_texcoord, v_texcoord))) * sharpness,
+          0.0, 1.0);
+      gl_FragColor = vec4(v_texcoord, 1, a);
     }
     `);
+    let sharpness_uniform = gl.getUniformLocation(prog, "sharpness");
     let pos_attr = gl.getAttribLocation(prog, "pos");
     let texcoord_attr = gl.getAttribLocation(prog, "texcoord");
 
@@ -69,7 +72,7 @@ function makeCircleDrawer(gl: WebGLRenderingContext) {
         -1, 1,
     ]), gl.STATIC_DRAW);
 
-    function drawCircle(x, y, r) {
+    function drawCircle(x, y, r, sharpness=10) {
         gl.useProgram(prog);
 
         gl.enableVertexAttribArray(pos_attr);
@@ -87,6 +90,7 @@ function makeCircleDrawer(gl: WebGLRenderingContext) {
         gl.bindBuffer(gl.ARRAY_BUFFER, texcoord_buffer);
         gl.vertexAttribPointer(texcoord_attr, 2, gl.FLOAT, false, 0, 0);
 
+        gl.uniform1f(sharpness_uniform, sharpness);
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
         gl.useProgram(null);
@@ -100,13 +104,17 @@ function start() {
     let canvas = <HTMLCanvasElement>document.getElementById('glcanvas');
     let gl = glFromCanvas(canvas);
     gl.viewport(0, 0, canvas.width, canvas.height);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     let drawCircle = makeCircleDrawer(gl);
     drawCircle(0.5, 0, 0.5);
     drawCircle(0.1, 0.3, 0.2);
-    drawCircle(0.1, -0.3, 0.25);
+    drawCircle(0.1, -0.3, 0.25, /*sharpness*/2);
     drawCircle(-0.1, -0.3, 0.15);
 }
 
