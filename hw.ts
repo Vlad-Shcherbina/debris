@@ -189,6 +189,25 @@ class Bubble {
         this.t_max = this.r * 20;
     }
     idle(dt: number) {
+        if (this.t_max >= 0 && this.t_max - dt < 0) {
+            let ripple = new Ripple();
+            ripple.x = this.x;
+            ripple.y = this.y;
+            ripple.r = 0.04;
+            ripple.t_min = 0;
+            ripple.t_max = 1.0;
+            ripple.color = [1, 0, 0, 1];
+            ripples.push(ripple);
+
+            ripple = new Ripple();
+            ripple.x = this.x;
+            ripple.y = this.y;
+            ripple.r = 0.06;
+            ripple.t_min = 0.1;
+            ripple.t_max = 0.5;
+            ripple.color = [1, 0, 0, 1];
+            ripples.push(ripple);
+        }
         this.t_min -= dt;
         this.t_max -= dt;
     }
