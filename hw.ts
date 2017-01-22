@@ -344,11 +344,7 @@ function start() {
 
     let prev_t = null;
 
-    canvas.onclick = function(e) {
-        let rect = canvas.getBoundingClientRect();
-        let x = (e.clientX - rect.left) / rect.width * 2 - 1;
-        let y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
-
+    function handleClick(x, y) {
         if (phase == GamePhase.DEAD)
             return;
 
@@ -368,6 +364,24 @@ function start() {
             ripples.push(r);
 
             misses++;
+        }
+    }
+
+    canvas.onclick = function(e) {
+        e.preventDefault();
+        let rect = canvas.getBoundingClientRect();
+        let x = (e.clientX - rect.left) / rect.width * 2 - 1;
+        let y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
+        handleClick(x, y);
+    }
+    canvas.ontouchstart = function(e) {
+        e.preventDefault();
+        let rect = canvas.getBoundingClientRect();
+        for (let i = 0; i < e.touches.length; i++) {
+            let t = e.touches.item(i);
+            let x = (t.clientX - rect.left) / rect.width * 2 - 1;
+            let y = (rect.bottom - t.clientY) / rect.height * 2 - 1;
+            handleClick(x, y);
         }
     }
 
