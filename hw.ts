@@ -318,6 +318,7 @@ let deathTimer = 0;
 let phase = GamePhase.WAIT;
 let points = 0;
 let misses = 0;
+let startTime: number = null;
 
 function lifeIndicatorPos(i: number) {
     return {x: 0.05 + 0.1 * i - 1, y: 1 - 0.05, r: 0.03};
@@ -407,6 +408,8 @@ function start() {
         }
 
         // Update
+        if (phase == GamePhase.WAIT)
+            startTime = t * 1e-3;
         if (phase != GamePhase.DEAD) {
             for (let b of bubbles) {
                 b.idle(dt);
@@ -424,9 +427,10 @@ function start() {
                 let e = document.getElementById("stats");
                 console.log(spawnRate);
                 e.innerHTML = `
-                Hits: ${points}<br>
+                <b>Hits: ${points}</b><br>
                 Misses: ${misses}<br>
-                Accuracy: ${Math.floor(100 * points / (points + misses))}%
+                Accuracy: ${Math.floor(100 * points / (points + misses))}%<br>
+                Time: ${(t * 1e-3 - startTime).toFixed(1)}s
                 `;
             }
         }
