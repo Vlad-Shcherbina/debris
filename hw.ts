@@ -195,12 +195,41 @@ class Bubble {
     isAlive() {
         return this.t_max >= 0;
     }
+    getA(t) {
+        if (this.t_min > t || this.t_max < t)
+            return 0;
+        let a = (t - this.t_min) / (this.t_max - this.t_min);
+        a = 1 - 2 * Math.abs(a - 0.5);
+        return a;
+    }
+    getRadius(a) {
+        return this.r * Math.sqrt(1 - (1-a)*(1-a));
+    }
     draw(drawCircle) {
         if (this.t_min > 0 || this.t_max < 0)
             return;
-        let a = -this.t_min / (this.t_max - this.t_min);
-        a = 1 - 2 * Math.abs(a - 0.5);
-        drawCircle(this.x, this.y, this.r * Math.sqrt(1 - (1-a)*(1-a)), /*sharpness*/10 * a);
+        let a = this.getA(0);
+        drawCircle(this.x, this.y, this.getRadius(a), /*sharpness*/10 * a);
+    }
+    click(x: number, y: number): boolean {
+        let r = this.getRadius(this.getA(0));
+        let d = Math.sqrt((this.x - x)**2 + (this.y - y)**2);
+        if (d <= r) {
+            this.t_min = -2;
+            this.t_max = -1;
+
+            let ripple = new Ripple();
+            ripple.x = this.x;
+            ripple.y = this.y;
+            ripple.r = r;
+            ripple.t_min = 0;
+            ripple.t_max = 0.5;
+            ripple.color = [0, 0.5, 1, 0.2];
+            ripples.push(ripple);
+
+            return true;
+        }
+        return false;
     }
 }
 
@@ -224,10 +253,13 @@ class Ripple {
         let a = -this.t_min / (this.t_max - this.t_min);
         let c = this.color;
         drawRing(
-            this.x, this.y, this.r * (1 + a),
+            this.x, this.y, this.r * (1 + 0.5 * a),
             0.3 + a, [c[0], c[1], c[2], (1.0 - a) * c[3]]);
     }
 }
+
+let bubbles: Bubble[] = [];
+let ripples: Ripple[] = [];
 
 function start() {
     let canvas = <HTMLCanvasElement>document.getElementById('glcanvas');
@@ -242,22 +274,26 @@ function start() {
 
     let prev_t = null;
 
-    let bubbles: Bubble[] = [];
-    let ripples: Ripple[] = [];
-
     canvas.onclick = function(e) {
         let rect = canvas.getBoundingClientRect();
         let x = (e.clientX - rect.left) / rect.width * 2 - 1;
         let y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
 
-        let r = new Ripple();
-        r.x = x;
-        r.y = y;
-        r.r = 0.05;
-        r.t_min = 0.0;
-        r.t_max = 0.5;
-        r.color = [1, 1, 1, 0.5];
-        ripples.push(r);
+        let miss = true;
+        for (let b of bubbles)
+            if (b.click(x, y))
+                miss = false;
+
+        if (miss) {
+            let r = new Ripple();
+            r.x = x;
+            r.y = y;
+            r.r = 0.05;
+            r.t_min = 0.0;
+            r.t_max = 0.5;
+            r.color = [1, 1, 1, 0.5];
+            ripples.push(r);
+        }
     }
 
     function renderFrame(t) {
