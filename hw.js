@@ -104,13 +104,36 @@ function makeRingDrawer(gl) {
 }
 var Bubble = (function () {
     function Bubble() {
-        this.x = (Math.random() * 2 - 1) * 0.9;
-        this.y = (Math.random() * 2 - 1) * 0.9;
-        this.r = 0.2 + Math.random() * 0.1;
-        this.t_min = 0;
-        this.t_max = this.r * 20;
     }
     Bubble.prototype.idle = function (dt) {
+        if (this.t_max >= 0 && this.t_max - dt < 0) {
+            var ripple = new Ripple();
+            ripple.x = this.x;
+            ripple.y = this.y;
+            ripple.r = 0.04;
+            ripple.t_min = 0;
+            ripple.t_max = 1.0;
+            ripple.color = [1, 0, 0, 1];
+            ripples.push(ripple);
+            ripple = new Ripple();
+            ripple.x = this.x;
+            ripple.y = this.y;
+            ripple.r = 0.06;
+            ripple.t_min = 0.1;
+            ripple.t_max = 0.5;
+            ripple.color = [1, 0, 0, 1];
+            ripples.push(ripple);
+            lives--;
+            var pos = lifeIndicatorPos(lives);
+            ripple = new Ripple();
+            ripple.x = pos.x;
+            ripple.y = pos.y;
+            ripple.r = pos.r;
+            ripple.t_min = 0.0;
+            ripple.t_max = 1.5;
+            ripple.color = [1, 0, 0, 1];
+            ripples.push(ripple);
+        }
         this.t_min -= dt;
         this.t_max -= dt;
     };
@@ -147,7 +170,27 @@ var Bubble = (function () {
             ripple.t_max = 0.5;
             ripple.color = [0, 0.5, 1, 0.2];
             ripples.push(ripple);
+            points++;
+            if (phase == GamePhase.WAIT) {
+                phase = GamePhase.PLAY;
+                misses = 0;
+            }
             return true;
+        }
+        return false;
+    };
+    Bubble.prototype.overlap = function (other) {
+        var t1 = Math.max(this.t_min, other.t_min);
+        var t2 = Math.min(this.t_max, other.t_max);
+        if (t1 >= t2)
+            return false;
+        var d = Math.sqrt(Math.pow((this.x - other.x), 2) + Math.pow((this.y - other.y), 2));
+        for (var i = 1; i < 5; i++) {
+            var t = t1 + i * (t2 - t1) / 5;
+            var r1 = this.getRadius(this.getA(t));
+            var r2 = other.getRadius(other.getA(t));
+            if (d < r1 + r2)
+                return true;
         }
         return false;
     };
@@ -172,8 +215,23 @@ var Ripple = (function () {
     };
     return Ripple;
 }());
+var GamePhase;
+(function (GamePhase) {
+    GamePhase[GamePhase["WAIT"] = 0] = "WAIT";
+    GamePhase[GamePhase["PLAY"] = 1] = "PLAY";
+    GamePhase[GamePhase["DEAD"] = 2] = "DEAD";
+})(GamePhase || (GamePhase = {}));
 var bubbles = [];
 var ripples = [];
+var lives = 5;
+var spawnRate = 1.5;
+var deathTimer = 0;
+var phase = GamePhase.WAIT;
+var points = 0;
+var misses = 0;
+function lifeIndicatorPos(i) {
+    return { x: 0.05 + 0.1 * i - 1, y: 1 - 0.05, r: 0.03 };
+}
 function start() {
     var canvas = document.getElementById('glcanvas');
     var gl = glFromCanvas(canvas);
@@ -182,15 +240,24 @@ function start() {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     var drawCircle = makeCircleDrawer(gl);
     var drawRing = makeRingDrawer(gl);
+    var b = new Bubble();
+    b.x = 0;
+    b.y = 0;
+    b.r = 0.3;
+    b.t_min = -1000;
+    b.t_max = 1000;
+    bubbles.push(b);
     var prev_t = null;
     canvas.onclick = function (e) {
         var rect = canvas.getBoundingClientRect();
         var x = (e.clientX - rect.left) / rect.width * 2 - 1;
         var y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
+        if (phase == GamePhase.DEAD)
+            return;
         var miss = true;
         for (var _i = 0, bubbles_1 = bubbles; _i < bubbles_1.length; _i++) {
-            var b = bubbles_1[_i];
-            if (b.click(x, y))
+            var b_1 = bubbles_1[_i];
+            if (b_1.click(x, y))
                 miss = false;
         }
         if (miss) {
@@ -202,6 +269,7 @@ function start() {
             r.t_max = 0.5;
             r.color = [1, 1, 1, 0.5];
             ripples.push(r);
+            misses++;
         }
     };
     function renderFrame(t) {
@@ -211,19 +279,63 @@ function start() {
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
+        // Draw
         for (var _i = 0, bubbles_2 = bubbles; _i < bubbles_2.length; _i++) {
-            var b = bubbles_2[_i];
-            b.draw(drawCircle);
-            b.idle(dt);
+            var b_2 = bubbles_2[_i];
+            b_2.draw(drawCircle);
         }
         for (var _a = 0, ripples_1 = ripples; _a < ripples_1.length; _a++) {
             var r = ripples_1[_a];
             r.draw(drawRing);
-            r.idle(dt);
         }
-        var spawn_rate = 2;
-        if (Math.random() < dt * spawn_rate) {
-            bubbles.push(new Bubble());
+        for (var i = 0; i < lives; i++) {
+            var pos = lifeIndicatorPos(i);
+            drawCircle(pos.x, pos.y, pos.r, /*sharpness*/ 5);
+        }
+        // Update
+        if (phase != GamePhase.DEAD) {
+            for (var _b = 0, bubbles_3 = bubbles; _b < bubbles_3.length; _b++) {
+                var b_3 = bubbles_3[_b];
+                b_3.idle(dt);
+            }
+            for (var _c = 0, ripples_2 = ripples; _c < ripples_2.length; _c++) {
+                var r = ripples_2[_c];
+                r.idle(dt);
+            }
+        }
+        if (phase == GamePhase.PLAY) {
+            spawnRate += dt / 40;
+            if (lives <= 0)
+                deathTimer += dt;
+            if (deathTimer > 0.3) {
+                phase = GamePhase.DEAD;
+                var e = document.getElementById("stats");
+                console.log(spawnRate);
+                e.innerHTML = "\n                Hits: " + points + "<br>\n                Misses: " + misses + "<br>\n                Accuracy: " + Math.floor(100 * points / (points + misses)) + "%\n                ";
+            }
+        }
+        if (phase == GamePhase.PLAY && Math.random() < dt * spawnRate) {
+            var added = false;
+            var _loop_1 = function (attempt) {
+                var b_4 = new Bubble();
+                b_4.x = (Math.random() * 2 - 1) * 0.9;
+                b_4.y = (Math.random() * 2 - 1) * 0.9;
+                b_4.r = 0.2 + Math.random() * 0.1;
+                b_4.t_min = 0;
+                b_4.t_max = b_4.r * 20;
+                if (bubbles.every(function (bb) { return !b_4.overlap(bb); })) {
+                    bubbles.push(b_4);
+                    added = true;
+                    return "break";
+                }
+            };
+            for (var attempt = 0; attempt < 10; attempt++) {
+                var state_1 = _loop_1(attempt);
+                if (state_1 === "break")
+                    break;
+            }
+            if (!added)
+                console.log("not enough room to spawn new bubble");
         }
         bubbles = bubbles.filter(function (b) { return b.isAlive(); });
         ripples = ripples.filter(function (r) { return r.isAlive(); });
