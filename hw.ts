@@ -207,6 +207,18 @@ class Bubble {
             ripple.t_max = 0.5;
             ripple.color = [1, 0, 0, 1];
             ripples.push(ripple);
+
+            lives--;
+            let pos = lifeIndicatorPos(lives);
+            ripple = new Ripple();
+            ripple.x = pos.x;
+            ripple.y = pos.y;
+            ripple.r = pos.r;
+            ripple.t_min = 0.0;
+            ripple.t_max = 1.5;
+            ripple.color = [1, 0, 0, 1];
+            ripples.push(ripple);
+
         }
         this.t_min -= dt;
         this.t_max -= dt;
@@ -279,6 +291,11 @@ class Ripple {
 
 let bubbles: Bubble[] = [];
 let ripples: Ripple[] = [];
+let lives = 5;
+
+function lifeIndicatorPos(i: number) {
+    return {x: 0.05 + 0.1 * i - 1, y: 1 - 0.05, r: 0.03};
+}
 
 function start() {
     let canvas = <HTMLCanvasElement>document.getElementById('glcanvas');
@@ -332,6 +349,11 @@ function start() {
             r.draw(drawRing);
             r.idle(dt);
         }
+        for (let i = 0; i < lives; i++) {
+            let pos = lifeIndicatorPos(i);
+            drawCircle(pos.x, pos.y, pos.r, /*sharpness*/5);
+        }
+
         const spawn_rate = 2;
         if (Math.random() < dt * spawn_rate) {
             bubbles.push(new Bubble());
