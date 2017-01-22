@@ -229,6 +229,7 @@ var deathTimer = 0;
 var phase = GamePhase.WAIT;
 var points = 0;
 var misses = 0;
+var startTime = null;
 function lifeIndicatorPos(i) {
     return { x: 0.05 + 0.1 * i - 1, y: 1 - 0.05, r: 0.03 };
 }
@@ -248,10 +249,7 @@ function start() {
     b.t_max = 1000;
     bubbles.push(b);
     var prev_t = null;
-    canvas.onclick = function (e) {
-        var rect = canvas.getBoundingClientRect();
-        var x = (e.clientX - rect.left) / rect.width * 2 - 1;
-        var y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
+    function handleClick(x, y) {
         if (phase == GamePhase.DEAD)
             return;
         var miss = true;
@@ -270,6 +268,23 @@ function start() {
             r.color = [1, 1, 1, 0.5];
             ripples.push(r);
             misses++;
+        }
+    }
+    canvas.onclick = function (e) {
+        e.preventDefault();
+        var rect = canvas.getBoundingClientRect();
+        var x = (e.clientX - rect.left) / rect.width * 2 - 1;
+        var y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
+        handleClick(x, y);
+    };
+    canvas.ontouchstart = function (e) {
+        e.preventDefault();
+        var rect = canvas.getBoundingClientRect();
+        for (var i = 0; i < e.touches.length; i++) {
+            var t = e.touches.item(i);
+            var x = (t.clientX - rect.left) / rect.width * 2 - 1;
+            var y = (rect.bottom - t.clientY) / rect.height * 2 - 1;
+            handleClick(x, y);
         }
     };
     function renderFrame(t) {
@@ -293,6 +308,8 @@ function start() {
             drawCircle(pos.x, pos.y, pos.r, /*sharpness*/ 5);
         }
         // Update
+        if (phase == GamePhase.WAIT)
+            startTime = t * 1e-3;
         if (phase != GamePhase.DEAD) {
             for (var _b = 0, bubbles_3 = bubbles; _b < bubbles_3.length; _b++) {
                 var b_3 = bubbles_3[_b];
@@ -311,7 +328,7 @@ function start() {
                 phase = GamePhase.DEAD;
                 var e = document.getElementById("stats");
                 console.log(spawnRate);
-                e.innerHTML = "\n                Hits: " + points + "<br>\n                Misses: " + misses + "<br>\n                Accuracy: " + Math.floor(100 * points / (points + misses)) + "%\n                ";
+                e.innerHTML = "\n                <b>Hits: " + points + "</b><br>\n                Misses: " + misses + "<br>\n                Accuracy: " + Math.floor(100 * points / (points + misses)) + "%<br>\n                Time: " + (t * 1e-3 - startTime).toFixed(1) + "s\n                ";
             }
         }
         if (phase == GamePhase.PLAY && Math.random() < dt * spawnRate) {
