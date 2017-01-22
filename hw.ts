@@ -262,6 +262,21 @@ class Bubble {
         }
         return false;
     }
+    overlap(other: Bubble) {
+        let t1 = Math.max(this.t_min, other.t_min);
+        let t2 = Math.min(this.t_max, other.t_max);
+        if (t1 >= t2)
+            return false;
+        let d = Math.sqrt((this.x - other.x)**2 + (this.y - other.y)**2);
+        for (let i = 1; i < 5; i++) {
+            let t = t1 + i * (t2 - t1) / 5;
+            let r1 = this.getRadius(this.getA(t));
+            let r2 = other.getRadius(other.getA(t));
+            if (d < r1 + r2)
+                return true;
+        }
+        return false;
+    }
 }
 
 class Ripple {
@@ -356,7 +371,17 @@ function start() {
 
         const spawn_rate = 2;
         if (Math.random() < dt * spawn_rate) {
-            bubbles.push(new Bubble());
+            let added = false;
+            for (let attempt = 0; attempt < 10; attempt++) {
+                let b = new Bubble();
+                if (bubbles.every((bb)=>!b.overlap(bb))) {
+                    bubbles.push(b);
+                    added = true;
+                    break;
+                }
+            }
+            if (!added)
+                console.log("not enough room to spawn new bubble");
         }
         bubbles = bubbles.filter((b) => b.isAlive());
         ripples = ripples.filter((r) => r.isAlive());
