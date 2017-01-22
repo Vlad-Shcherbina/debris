@@ -181,13 +181,7 @@ class Bubble {
     r: number;
     t_min: number;
     t_max: number;
-    constructor() {
-        this.x = (Math.random() * 2 - 1) * 0.9;
-        this.y = (Math.random() * 2 - 1) * 0.9;
-        this.r = 0.2 + Math.random() * 0.1;
-        this.t_min = 0;
-        this.t_max = this.r * 20;
-    }
+
     idle(dt: number) {
         if (this.t_max >= 0 && this.t_max - dt < 0) {
             let ripple = new Ripple();
@@ -258,6 +252,12 @@ class Bubble {
             ripple.color = [0, 0.5, 1, 0.2];
             ripples.push(ripple);
 
+            points++;
+
+            if (phase == GamePhase.WAIT) {
+                phase = GamePhase.PLAY;
+                misses = 0;
+            }
             return true;
         }
         return false;
@@ -304,9 +304,20 @@ class Ripple {
     }
 }
 
+enum GamePhase {
+    WAIT,
+    PLAY,
+    DEAD,
+}
+
 let bubbles: Bubble[] = [];
 let ripples: Ripple[] = [];
 let lives = 5;
+let spawnRate = 1.5;
+let deathTimer = 0;
+let phase = GamePhase.WAIT;
+let points = 0;
+let misses = 0;
 
 function lifeIndicatorPos(i: number) {
     return {x: 0.05 + 0.1 * i - 1, y: 1 - 0.05, r: 0.03};
@@ -323,12 +334,23 @@ function start() {
     let drawCircle = makeCircleDrawer(gl);
     let drawRing = makeRingDrawer(gl);
 
+    let b = new Bubble();
+    b.x = 0;
+    b.y = 0;
+    b.r = 0.3;
+    b.t_min = -1000;
+    b.t_max = 1000;
+    bubbles.push(b);
+
     let prev_t = null;
 
     canvas.onclick = function(e) {
         let rect = canvas.getBoundingClientRect();
         let x = (e.clientX - rect.left) / rect.width * 2 - 1;
         let y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
+
+        if (phase == GamePhase.DEAD)
+            return;
 
         let miss = true;
         for (let b of bubbles)
@@ -344,6 +366,8 @@ function start() {
             r.t_max = 0.5;
             r.color = [1, 1, 1, 0.5];
             ripples.push(r);
+
+            misses++;
         }
     }
 
@@ -356,24 +380,51 @@ function start() {
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
+        // Draw
         for (let b of bubbles) {
             b.draw(drawCircle);
-            b.idle(dt);
         }
         for (let r of ripples) {
             r.draw(drawRing);
-            r.idle(dt);
         }
         for (let i = 0; i < lives; i++) {
             let pos = lifeIndicatorPos(i);
             drawCircle(pos.x, pos.y, pos.r, /*sharpness*/5);
         }
 
-        const spawn_rate = 2;
-        if (Math.random() < dt * spawn_rate) {
+        // Update
+        if (phase != GamePhase.DEAD) {
+            for (let b of bubbles) {
+                b.idle(dt);
+            }
+            for (let r of ripples) {
+                r.idle(dt);
+            }
+        }
+        if (phase == GamePhase.PLAY) {
+            spawnRate += dt / 40;
+            if (lives <= 0)
+                deathTimer += dt;
+            if (deathTimer > 0.3) {
+                phase = GamePhase.DEAD;
+                let e = document.getElementById("stats");
+                console.log(spawnRate);
+                e.innerHTML = `
+                Hits: ${points}<br>
+                Misses: ${misses}<br>
+                Accuracy: ${Math.floor(100 * points / (points + misses))}%
+                `;
+            }
+        }
+        if (phase == GamePhase.PLAY && Math.random() < dt * spawnRate) {
             let added = false;
             for (let attempt = 0; attempt < 10; attempt++) {
                 let b = new Bubble();
+                b.x = (Math.random() * 2 - 1) * 0.9;
+                b.y = (Math.random() * 2 - 1) * 0.9;
+                b.r = 0.2 + Math.random() * 0.1;
+                b.t_min = 0;
+                b.t_max = b.r * 20;
                 if (bubbles.every((bb)=>!b.overlap(bb))) {
                     bubbles.push(b);
                     added = true;
