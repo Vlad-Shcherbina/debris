@@ -129,6 +129,27 @@ class Bubble {
     }
 }
 
+class Ripple {
+    x: number;
+    y: number;
+    r: number;
+    t_min: number;
+    t_max: number;
+    idle(dt: number) {
+        this.t_min -= dt;
+        this.t_max -= dt;
+    }
+    isAlive() {
+        return this.t_max >= 0;
+    }
+    draw(drawCircle) {
+        if (this.t_min > 0 || this.t_max < 0)
+            return;
+        let a = -this.t_min / (this.t_max - this.t_min);
+        drawCircle(this.x, this.y, this.r * (1 + a), /*sharpness*/2 * (1 - a));
+    }
+}
+
 function start() {
     let canvas = <HTMLCanvasElement>document.getElementById('glcanvas');
     let gl = glFromCanvas(canvas);
@@ -141,19 +162,20 @@ function start() {
     let prev_t = null;
 
     let bubbles: Bubble[] = [];
+    let ripples: Ripple[] = [];
 
     canvas.onclick = function(e) {
         let rect = canvas.getBoundingClientRect();
         let x = (e.clientX - rect.left) / rect.width * 2 - 1;
         let y = (rect.bottom - e.clientY) / rect.height * 2 - 1;
 
-        let b = new Bubble();
-        b.x = x;
-        b.y = y;
-        b.r = 0.05;
-        b.t_min = -0.2;
-        b.t_max = 0.2;
-        bubbles.push(b);
+        let r = new Ripple();
+        r.x = x;
+        r.y = y;
+        r.r = 0.05;
+        r.t_min = 0.0;
+        r.t_max = 0.5;
+        ripples.push(r);
     }
 
     function renderFrame(t) {
@@ -169,11 +191,16 @@ function start() {
             b.draw(drawCircle);
             b.idle(dt);
         }
+        for (let r of ripples) {
+            r.draw(drawCircle);
+            r.idle(dt);
+        }
         const spawn_rate = 2;
         if (Math.random() < dt * spawn_rate) {
             bubbles.push(new Bubble());
         }
         bubbles = bubbles.filter((b) => b.isAlive());
+        ripples = ripples.filter((r) => r.isAlive());
     }
     requestAnimationFrame(renderFrame);
 }
