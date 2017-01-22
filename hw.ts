@@ -100,6 +100,81 @@ function makeCircleDrawer(gl: WebGLRenderingContext) {
     return drawCircle;
 }
 
+function makeRingDrawer(gl: WebGLRenderingContext):
+    (x: number, y: number, r: number, width: number, color: number[])=>void {
+
+    let prog = makeShaderProgram(gl, `
+    attribute vec2 pos;
+    attribute vec2 texcoord;
+
+    varying vec2 v_texcoord;
+
+    void main() {
+      gl_Position = vec4(pos, 0, 1.0);
+      v_texcoord = texcoord;
+    }
+    `, `
+    precision mediump float;
+
+    uniform vec4 color;
+    uniform float width;
+
+    varying vec2 v_texcoord;
+
+    void main() {
+      float a = clamp(
+          (1.0 - sqrt(dot(v_texcoord, v_texcoord))) / width,
+          0.0, 1.0);
+      a = 1.0 - 2.0 * abs(a - 0.5);
+      gl_FragColor = vec4(color.rgb, color.a * a);
+    }
+    `);
+    let color_uniform = gl.getUniformLocation(prog, "color");
+    let width_uniform = gl.getUniformLocation(prog, "width");
+    let pos_attr = gl.getAttribLocation(prog, "pos");
+    let texcoord_attr = gl.getAttribLocation(prog, "texcoord");
+
+    let pos_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, pos_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(8), gl.DYNAMIC_DRAW);
+
+    let texcoord_buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texcoord_buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1,
+        1, -1,
+        1, 1,
+        -1, 1,
+    ]), gl.STATIC_DRAW);
+
+    return function(x, y, r, width, color) {
+        gl.useProgram(prog);
+
+        gl.enableVertexAttribArray(pos_attr);
+        gl.bindBuffer(gl.ARRAY_BUFFER, pos_buffer);
+        let vertices = new Float32Array([
+            x - r, y - r,
+            x + r, y - r,
+            x + r, y + r,
+            x - r, y + r,
+        ]);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices);
+        gl.vertexAttribPointer(pos_attr, 2, gl.FLOAT, false, 0, 0);
+
+        gl.enableVertexAttribArray(texcoord_attr);
+        gl.bindBuffer(gl.ARRAY_BUFFER, texcoord_buffer);
+        gl.vertexAttribPointer(texcoord_attr, 2, gl.FLOAT, false, 0, 0);
+
+        gl.uniform1f(width_uniform, width);
+        gl.uniform4fv(color_uniform, color);
+
+        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+        gl.useProgram(null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    };
+}
+
 class Bubble {
     x: number;
     y: number;
@@ -135,6 +210,7 @@ class Ripple {
     r: number;
     t_min: number;
     t_max: number;
+    color: number[];
     idle(dt: number) {
         this.t_min -= dt;
         this.t_max -= dt;
@@ -142,11 +218,14 @@ class Ripple {
     isAlive() {
         return this.t_max >= 0;
     }
-    draw(drawCircle) {
+    draw(drawRing) {
         if (this.t_min > 0 || this.t_max < 0)
             return;
         let a = -this.t_min / (this.t_max - this.t_min);
-        drawCircle(this.x, this.y, this.r * (1 + a), /*sharpness*/2 * (1 - a));
+        let c = this.color;
+        drawRing(
+            this.x, this.y, this.r * (1 + a),
+            0.3 + a, [c[0], c[1], c[2], (1.0 - a) * c[3]]);
     }
 }
 
@@ -159,6 +238,8 @@ function start() {
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     let drawCircle = makeCircleDrawer(gl);
+    let drawRing = makeRingDrawer(gl);
+
     let prev_t = null;
 
     let bubbles: Bubble[] = [];
@@ -175,6 +256,7 @@ function start() {
         r.r = 0.05;
         r.t_min = 0.0;
         r.t_max = 0.5;
+        r.color = [1, 1, 1, 0.5];
         ripples.push(r);
     }
 
@@ -192,7 +274,7 @@ function start() {
             b.idle(dt);
         }
         for (let r of ripples) {
-            r.draw(drawCircle);
+            r.draw(drawRing);
             r.idle(dt);
         }
         const spawn_rate = 2;
